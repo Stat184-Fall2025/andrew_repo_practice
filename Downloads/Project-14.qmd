@@ -46,126 +46,130 @@ library(tinytex)
 I will use the wrangled data to explore whether sex and rank are independent of one another through a two-way frequency table.
 
 ```{r Data Wrangling and Creating Data Frames for Armed Forces}
-
-# Scrape Ranks from Github
+# Scrape Ranks from GitHub
 ranks <- read_html(
-  "https://neilhatfield.github.io/Stat184_PayGradeRanks.html") %>%
+  "https://neilhatfield.github.io/Stat184_PayGradeRanks.html"
+) %>%
   html_elements(css = "table") %>%
   html_table()
 
 ranks_df <- ranks[[1]]
 
-# Cleaning Ranks DF
-ranks_df[1, 1] <- "Type" # cell 1 value
-ranks_head <- ranks_df[1, ] # column headers
-names(ranks_df) <- ranks_head[1,] # header -> column name
-ranks_df <- ranks_df[-c(1, 26), ] # remove irrelevant rows
+# Clean ranks data
+ranks_df[1, 1] <- "Type"
+ranks_head <- ranks_df[1, ]
+names(ranks_df) <- ranks_head[1, ]
+ranks_df <- ranks_df[-c(1, 26), ]
+
 ranks_df <- ranks_df %>%
-  rename(Pay.Grade = `Pay Grade`) # remove bad name
+  rename(Pay.Grade = `Pay Grade`)
 
 ranks_clean <- ranks_df %>%
-  dplyr::select(!Type) %>%
+  select(!Type) %>%
   pivot_longer(
-    cols = !Pay.Grade,
-    names_to = "Branch",
+    cols      = !Pay.Grade,
+    names_to  = "Branch",
     values_to = "Rank"
   ) %>%
   mutate(
-    Rank = na_if(x = Rank, y = "--")
+    Rank = na_if(Rank, "--")
   )
+
 ```
 ```{r}
-# Grab DF from googlesheets4
-## headers
+# Pull Armed Forces data from Google Sheets
 gs4_deauth()
 
 raw_headers <- read_sheet(
-  ss = 
-    "https://docs.google.com/spreadsheets/d/19xQnI1cBh6Jkw7eP8YQuuicMlVDF7Gr-nXCb5qbwb_E/edit?usp=sharing",
-  col_names = FALSE,
-  n_max = 3
+  ss         = "https://docs.google.com/spreadsheets/d/19xQnI1cBh6Jkw7eP8YQuuicMlVDF7Gr-nXCb5qbwb_E/edit?usp=sharing",
+  col_names  = FALSE,
+  n_max      = 3
 )
 
-## DF
 raw <- read_sheet(
-  ss = 
-    "https://docs.google.com/spreadsheets/d/19xQnI1cBh6Jkw7eP8YQuuicMlVDF7Gr-nXCb5qbwb_E/edit?usp=sharing",
-  col_names = FALSE, # will define column names later
-  skip = 3, # given headers are incomplete, will need to define later
-  n_max = 28,
-  na = c("N/A*")
+  ss         = "https://docs.google.com/spreadsheets/d/19xQnI1cBh6Jkw7eP8YQuuicMlVDF7Gr-nXCb5qbwb_E/edit?usp=sharing",
+  col_names  = FALSE,
+  skip       = 3,
+  n_max      = 28,
+  na         = c("N/A*")
 )
-```
-```{r}
-# Wrangling + Cleaning
-branch <- rep( # repeat due to 3 occurrences of each branch
-  x = c("Army", "Navy", "Marine Corps", "Air Force", "Space Force", "Total"),
+
+# Construct column names and clean structure
+branch <- rep(
+  x    = c("Army", "Navy", "Marine Corps", "Air Force", "Space Force", "Total"),
   each = 3
 )
 
-raw_head <- paste( # branch + headers
+raw_head <- paste(
   c("Pay.Grade", branch),
-  raw_headers[3,],
+  raw_headers[3, ],
   sep = "."
 )
 
 raw_head[1] <- "Pay.Grade"
+names(raw) <- raw_head
 
-names(raw) <- raw_head # Applying headers to column names
+
 ```
 ```{r}
-# Tidying Data for first DF
+# First-stage tidying
 df <- raw %>%
   pivot_longer(
-    cols = -Pay.Grade,
-    names_to = c('Branch', 'Gender'),
-    names_pattern = '(Army|Navy|Marine\\.Corps
-    |Air\\.Force|Space\\.Force|Total)\\.(Male|Female|Total)',
-    values_to = 'Count'
+    cols         = -Pay.Grade,
+    names_to     = c("Branch", "Gender"),
+    names_pattern = "(Army|Navy|Marine\\.Corps|Air\\.Force|Space\\.Force|Total)\\.(Male|Female|Total)",
+    values_to    = "Count"
   ) %>%
-  filter(!str_detect(Pay.Grade, regex('total', ignore_case = TRUE))) %>%
-  filter(!str_detect(Pay.Grade, regex('Source', ignore_case = TRUE))) %>%
-  filter(!str_detect(Branch, regex('total', ignore_case = TRUE))) %>%
-  filter(!str_detect(Gender, regex('total', ignore_case = TRUE))) %>%
-  filter(!is.na(Count)) %>%
+  filter(
+    !str_detect(Pay.Grade, regex("total",  ignore_case = TRUE)),
+    !str_detect(Pay.Grade, regex("Source", ignore_case = TRUE)),
+    !str_detect(Branch,    regex("total",  ignore_case = TRUE)),
+    !str_detect(Gender,    regex("total",  ignore_case = TRUE)),
+    !is.na(Count)
+  ) %>%
   mutate(
     Count = gsub(",", "", Count),
     Count = as.integer(Count)
   )
 
-# Merge Rank DF and Armed Forces DF
-df1 <- left_join(
-  x = df,
-  y = ranks_clean,
-  by = join_by(Pay.Grade == Pay.Grade, Branch == Branch)
-)
+df1 <- df %>%
+  left_join(
+    ranks_clean,
+    by = join_by(Pay.Grade == Pay.Grade, Branch == Branch)
+  )
+
 ```
 ```{r}
-# Tidying Data for second DF
+# Convert counts to individual rows
 df2 <- df1 %>%
   uncount(weights = Count)
 ```
 ```{r Creating Frequency Table correlating gender with rank}
 #| results: 'asis'
-# Create frequency table 
+# Frequency table: Gender × Rank (Army enlisted)
 gender_freq <- df2 %>%
   filter(
-    Pay.Grade %in% c('E1','E2','E3','E4','E5','E6','E7','E8','E9'),
+    Pay.Grade %in% c("E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9"),
     Branch == "Army"
-    ) %>%
+  ) %>%
   mutate(
-    Rank = factor(Rank, levels = unique(Rank))) %>%
+    Rank = factor(Rank, levels = unique(Rank))
+  ) %>%
   tabyl(Rank, Gender)
+
 print(
-  knitr::kable(
-    gender_freq,
-    format = "latex",
-    booktabs = TRUE,
-    align = c("l", "r", "r"),
-    caption = "Army Enlisted Gender Distribution by Rank"
-  )%>%
-    kableExtra::kable_styling(latex_options = "hold_position")
+  gender_freq %>%
+    knitr::kable(
+      format  = "latex",
+      booktabs = TRUE,
+      align    = c("l", "r", "r"),
+      caption  = "Army Enlisted Gender Distribution by Rank"
+    ) %>%
+    kableExtra::kable_styling(
+      latex_options = "hold_position"
+    )
 )
+
 ```
 ## Observations from the table
 The table displays the gender distribution of enlisted personnel across Army ranks. From the data, we can observe a consistent pattern: the number of male soldiers significantly exceeds that of female soldiers at every enlisted rank. While both sexes are represented at all levels, the disparity becomes more pronounced in higher ranks such as Sergeant First Class and Sergeant Major or Command Sergeant Major.
@@ -179,38 +183,48 @@ Overall, this visualization highlights structural gender differences in career p
 To explore the popularity of some names, I’ve decided to focus on the popularity of the first names of myself and immediate family: Andrew, Dillon, Dylan, and Katherine. I will focus on the overall popularity of the name, without making a distinction based on the baby’s sex.
 
 ```{r}
-# Load libraries
+# Baby Names analysis
 library(ggplot2)
 library(dplyr)
 
-# Load data
-data(BabyNames, package='dcData')
+data(BabyNames, package = "dcData")
 
-# Filter for selected names (given in project description)
 names_subset <- BabyNames %>%
-  filter(name %in% c('Andrew', 'Dillon', 'Dylan', 'Katherine')) %>%
-  group_by(year, name) %>%
-  summarize(total = sum(count), .groups = "drop")
+  filter(
+    name %in% c("Andrew", "Dillon", "Dylan", "Katherine")
+  ) %>%
+  group_by(
+    year, name
+  ) %>%
+  summarize(
+    total  = sum(count),
+    .groups = "drop"
+  )
 
-# Visualization: popularity over time
 print(
-  ggplot(names_subset, aes(x = year, y = total, 
-                           color = name, linetype = name)) +
-    geom_line(linewidth = 1) +
-    labs(title = "Popularity of Selected Names Over Time",
-         x = "Year",
-         y = "Number of Births",
-         color = "Name",
-         alt = "A line chart titled 'Popularity of Selected Names Over Time.' 
-         The x-axis shows years from about 1880 to 2020, and the y-axis shows 
-         the number of births. Four lines represent the names 
-         Andrew (solid red), Dillon (dashed green), Dylan (dot-dashed teal), 
-         and Kathryn (dotted purple). Andrew peaks sharply around 1985, 
-         Dylan rises in the 1990s, Kathryn shows moderate peaks mid-century 
-         and late 20th century, and Dillon remains consistently low.",
-         linetype = "Name") +
+  ggplot(
+    names_subset,
+    aes(
+      x        = year,
+      y        = total,
+      color    = name,
+      linetype = name
+    )
+  ) +
+    geom_line(
+      linewidth = 1
+    ) +
+    labs(
+      title   = "Popularity of Selected Names Over Time",
+      x       = "Year",
+      y       = "Number of Births",
+      color   = "Name",
+      alt     = "A line chart showing popularity of four names from 1880 to 2020.",
+      linetype = "Name"
+    ) +
     theme_minimal()
 )
+
 ```
 ## Observations from the visualization
 The chart tracks the number of U.S. births per year for four given names—Andrew, Dillon, Dylan, and Kathryn—from approximately 1880 through 2020. The visualization uses both color and line type to distinguish each name.
@@ -231,29 +245,42 @@ Distinct line types and colors improve readability and allow overlapping pattern
 # The Box Problem
 
 ```{r}
-# Goal 1: Create a function to get the volume of a box
-# Needs: side length of cutouts (cutLength), paper dimensions, Volume formula
-# Defining paper dimensions
+# Box Problem: volume function and visualization
 PAPERLEN <- 36
 PAPERWID <- 48
 
-# Applying to volume function
-vol_calc <- function(cutLength){
-  length <- PAPERLEN-(2*cutLength)
-  width <- PAPERWID-(2*cutLength)
-  volume <- length*width*cutLength
-  return(volume)
+vol_calc <- function(cut_length) {
+  length <- PAPERLEN - (2 * cut_length)
+  width  <- PAPERWID - (2 * cut_length)
+  length * width * cut_length
 }
 
-# Plugging volume function into omptimization
-max <- optimize(vol_calc, c(0, (PAPERLEN/2)), maximum=TRUE)
+max <- optimize(
+  vol_calc,
+  interval = c(0, PAPERLEN / 2),
+  maximum  = TRUE
+)
+
 print(max)
 
-# Goal 2: Use plot() to create data visualization showing the 
-# relationship between cut and volume
-curve(vol_calc, from=0, to=(PAPERLEN/2), col="black", lwd=2,
-      xlab="cut length", ylab="volume", main="cut vs volume")
-points(max$maximum, max$objective, col="red", pch=19)
+curve(
+  vol_calc,
+  from  = 0,
+  to    = PAPERLEN / 2,
+  col   = "black",
+  lwd   = 2,
+  xlab  = "cut length",
+  ylab  = "volume",
+  main  = "cut vs volume"
+)
+
+points(
+  max$maximum,
+  max$objective,
+  col = "red",
+  pch = 19
+)
+
 ```
 ## Observations from the visualization
 The chart, titled “cut vs volume,” visualizes how the volume of an open-top box changes with varying cut lengths from the corners of a rectangular sheet. The x-axis shows the cut length, and the y-axis represents the resulting box volume.
@@ -279,140 +306,147 @@ I look forward to diving further into R as not only a programming language, but 
 #| echo: true
 #| eval: false
 
-# Scrape Ranks from Github
+# Scrape Ranks from GitHub
 ranks <- read_html(
-  "https://neilhatfield.github.io/Stat184_PayGradeRanks.html") %>%
+  "https://neilhatfield.github.io/Stat184_PayGradeRanks.html"
+) %>%
   html_elements(css = "table") %>%
   html_table()
 
 ranks_df <- ranks[[1]]
 
-# Cleaning Ranks DF
-ranks_df[1, 1] <- "Type" # cell 1 value
-ranks_head <- ranks_df[1, ] # column headers
-names(ranks_df) <- ranks_head[1,] # header -> column name
-ranks_df <- ranks_df[-c(1, 26), ] # remove irrelevant rows
+# Clean ranks data
+ranks_df[1, 1] <- "Type"
+ranks_head <- ranks_df[1, ]
+names(ranks_df) <- ranks_head[1, ]
+ranks_df <- ranks_df[-c(1, 26), ]
+
 ranks_df <- ranks_df %>%
-  rename(Pay.Grade = `Pay Grade`) # remove bad name
+  rename(Pay.Grade = `Pay Grade`)
 
 ranks_clean <- ranks_df %>%
-  dplyr::select(!Type) %>%
+  select(!Type) %>%
   pivot_longer(
-    cols = !Pay.Grade,
-    names_to = "Branch",
+    cols      = !Pay.Grade,
+    names_to  = "Branch",
     values_to = "Rank"
   ) %>%
   mutate(
-    Rank = na_if(x = Rank, y = "--")
+    Rank = na_if(Rank, "--")
   )
+
 ```
 ### Step 2: Building USAF Data Frame
 ```{r}
 #| echo: true
 #| eval: false
-# Grab DF from googlesheets4
-## headers
+# Pull Armed Forces data from Google Sheets
 gs4_deauth()
 
 raw_headers <- read_sheet(
-  ss = 
-    "https://docs.google.com/spreadsheets/d/19xQnI1cBh6Jkw7eP8YQuuicMlVDF7Gr-nXCb5qbwb_E/edit?usp=sharing",
-  col_names = FALSE,
-  n_max = 3
+  ss         = "https://docs.google.com/spreadsheets/d/19xQnI1cBh6Jkw7eP8YQuuicMlVDF7Gr-nXCb5qbwb_E/edit?usp=sharing",
+  col_names  = FALSE,
+  n_max      = 3
 )
 
-## DF
 raw <- read_sheet(
-  ss = 
-    "https://docs.google.com/spreadsheets/d/19xQnI1cBh6Jkw7eP8YQuuicMlVDF7Gr-nXCb5qbwb_E/edit?usp=sharing",
-  col_names = FALSE, # will define column names later
-  skip = 3, # given headers are incomplete, will need to define later
-  n_max = 28,
-  na = c("N/A*")
+  ss         = "https://docs.google.com/spreadsheets/d/19xQnI1cBh6Jkw7eP8YQuuicMlVDF7Gr-nXCb5qbwb_E/edit?usp=sharing",
+  col_names  = FALSE,
+  skip       = 3,
+  n_max      = 28,
+  na         = c("N/A*")
 )
+
 ```
 ### Step 3: Data Wrangling for USAF Data Frame
 ```{r}
 #| echo: true
 #| eval: false
-# Wrangling + Cleaning
-branch <- rep( # repeat due to 3 occurrences of each branch
-  x = c("Army", "Navy", "Marine Corps", "Air Force", "Space Force", "Total"),
+# Construct column names and clean structure
+branch <- rep(
+  x    = c("Army", "Navy", "Marine Corps", "Air Force", "Space Force", "Total"),
   each = 3
 )
 
-raw_head <- paste( # branch + headers
+raw_head <- paste(
   c("Pay.Grade", branch),
-  raw_headers[3,],
+  raw_headers[3, ],
   sep = "."
 )
 
 raw_head[1] <- "Pay.Grade"
+names(raw) <- raw_head
 
-names(raw) <- raw_head # Applying headers to column names
 ```
 ### Step 4: Tidying USAF Data Frames
 ```{r}
 #| echo: true
 #| eval: false
-# Tidying Data for first DF
+# First-stage tidying
 df <- raw %>%
   pivot_longer(
-    cols = -Pay.Grade,
-    names_to = c('Branch', 'Gender'),
-    names_pattern = '(Army|Navy|Marine\\.Corps
-    |Air\\.Force|Space\\.Force|Total)\\.(Male|Female|Total)',
-    values_to = 'Count'
+    cols         = -Pay.Grade,
+    names_to     = c("Branch", "Gender"),
+    names_pattern = "(Army|Navy|Marine\\.Corps|Air\\.Force|Space\\.Force|Total)\\.(Male|Female|Total)",
+    values_to    = "Count"
   ) %>%
-  filter(!str_detect(Pay.Grade, regex('total', ignore_case = TRUE))) %>%
-  filter(!str_detect(Pay.Grade, regex('Source', ignore_case = TRUE))) %>%
-  filter(!str_detect(Branch, regex('total', ignore_case = TRUE))) %>%
-  filter(!str_detect(Gender, regex('total', ignore_case = TRUE))) %>%
-  filter(!is.na(Count)) %>%
+  filter(
+    !str_detect(Pay.Grade, regex("total",  ignore_case = TRUE)),
+    !str_detect(Pay.Grade, regex("Source", ignore_case = TRUE)),
+    !str_detect(Branch,    regex("total",  ignore_case = TRUE)),
+    !str_detect(Gender,    regex("total",  ignore_case = TRUE)),
+    !is.na(Count)
+  ) %>%
   mutate(
     Count = gsub(",", "", Count),
     Count = as.integer(Count)
   )
 
-# Merge Rank DF and Armed Forces DF
-df1 <- left_join(
-  x = df,
-  y = ranks_clean,
-  by = join_by(Pay.Grade == Pay.Grade, Branch == Branch)
-)
+df1 <- df %>%
+  left_join(
+    ranks_clean,
+    by = join_by(Pay.Grade == Pay.Grade, Branch == Branch)
+  )
+
 ```
 ### Step 5: Creating frame where a case is an individual soldier
 ```{r}
 #| echo: true
 #| eval: false
-# Tidying Data for second DF
+# Convert counts to individual rows
 df2 <- df1 %>%
   uncount(weights = Count)
+
 ```
 ### Step 6: Creating frequency table correlating Gender with Rank
 ```{r}
 #| echo: true
 #| eval: false
 #| results: 'asis'
-# Create frequency table 
+# Frequency table: Gender × Rank (Army enlisted)
 gender_freq <- df2 %>%
   filter(
-    Pay.Grade %in% c('E1','E2','E3','E4','E5','E6','E7','E8','E9'),
+    Pay.Grade %in% c("E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9"),
     Branch == "Army"
-    ) %>%
+  ) %>%
   mutate(
-    Rank = factor(Rank, levels = unique(Rank))) %>%
+    Rank = factor(Rank, levels = unique(Rank))
+  ) %>%
   tabyl(Rank, Gender)
+
 print(
-  knitr::kable(
-    gender_freq,
-    format = "latex",
-    booktabs = TRUE,
-    align = c("l", "r", "r"),
-    caption = "Army Enlisted Gender Distribution by Rank"
-  )%>%
-    kableExtra::kable_styling(latex_options = "hold_position")
+  gender_freq %>%
+    knitr::kable(
+      format  = "latex",
+      booktabs = TRUE,
+      align    = c("l", "r", "r"),
+      caption  = "Army Enlisted Gender Distribution by Rank"
+    ) %>%
+    kableExtra::kable_styling(
+      latex_options = "hold_position"
+    )
 )
+
 ```
 
 ## Baby Names
@@ -420,14 +454,22 @@ print(
 ```{r Baby Names (appendix)}
 #| echo: true
 #| eval: false
-# Load data
-data(BabyNames, package='dcData')
+library(ggplot2)
+library(dplyr)
 
-# Filter for selected names (given in project description)
+data(BabyNames, package = "dcData")
+
 names_subset <- BabyNames %>%
-  filter(name %in% c('Andrew', 'Dillon', 'Dylan', 'Katherine')) %>%
-  group_by(year, name) %>%
-  summarize(total = sum(count), .groups = "drop")
+  filter(
+    name %in% c("Andrew", "Dillon", "Dylan", "Katherine")
+  ) %>%
+  group_by(
+    year, name
+  ) %>%
+  summarize(
+    total  = sum(count),
+    .groups = "drop"
+  )
 ```
 ### Create data visualization
 ```{r}
@@ -435,21 +477,26 @@ names_subset <- BabyNames %>%
 #| eval: false
 # Visualization: popularity over time
 print(
-  ggplot(names_subset, aes(x = year, y = total, 
-                           color = name, linetype = name)) +
-    geom_line(linewidth = 1) +
-    labs(title = "Popularity of Selected Names Over Time",
-         x = "Year",
-         y = "Number of Births",
-         color = "Name",
-         alt = "A line chart titled 'Popularity of Selected Names Over Time.' 
-         The x-axis shows years from about 1880 to 2020, and the y-axis shows 
-         the number of births. Four lines represent the names 
-         Andrew (solid red), Dillon (dashed green), Dylan (dot-dashed teal), 
-         and Kathryn (dotted purple). Andrew peaks sharply around 1985, 
-         Dylan rises in the 1990s, Kathryn shows moderate peaks mid-century 
-         and late 20th century, and Dillon remains consistently low.",
-         linetype = "Name") +
+  ggplot(
+    names_subset,
+    aes(
+      x        = year,
+      y        = total,
+      color    = name,
+      linetype = name
+    )
+  ) +
+    geom_line(
+      linewidth = 1
+    ) +
+    labs(
+      title   = "Popularity of Selected Names Over Time",
+      x       = "Year",
+      y       = "Number of Births",
+      color   = "Name",
+      alt     = "A line chart showing popularity of four names from 1880 to 2020.",
+      linetype = "Name"
+    ) +
     theme_minimal()
 )
 ```
@@ -459,31 +506,42 @@ print(
 ```{r}
 #| echo: true
 #| eval: false
-# Goal 1: Create a function to get the volume of a box
-# Needs: side length of cutouts (cutLength), paper dimensions, Volume formula
-# Defining paper dimensions
 PAPERLEN <- 36
 PAPERWID <- 48
 
-# Applying to volume function
-vol_calc <- function(cutLength){
-  length <- PAPERLEN-(2*cutLength)
-  width <- PAPERWID-(2*cutLength)
-  volume <- length*width*cutLength
-  return(volume)
+vol_calc <- function(cut_length) {
+  length <- PAPERLEN - (2 * cut_length)
+  width  <- PAPERWID - (2 * cut_length)
+  length * width * cut_length
 }
 
-# Plugging volume function into omptimization
-max <- optimize(vol_calc, c(0, (PAPERLEN/2)), maximum=TRUE)
+max <- optimize(
+  vol_calc,
+  interval = c(0, PAPERLEN / 2),
+  maximum  = TRUE
+)
+
 print(max)
 ```
 ### Creating data visualization
 ```{r}
 #| echo: true
 #| eval: false
-# Goal 2: Use plot() to create data visualization showing the relationship 
-# between cut and volume
-curve(vol_calc, from=0, to=(PAPERLEN/2), col="black", lwd=2,
-      xlab="cut length", ylab="volume", main="cut vs volume")
-points(max$maximum, max$objective, col="red", pch=19)
+curve(
+  vol_calc,
+  from  = 0,
+  to    = PAPERLEN / 2,
+  col   = "black",
+  lwd   = 2,
+  xlab  = "cut length",
+  ylab  = "volume",
+  main  = "cut vs volume"
+)
+
+points(
+  max$maximum,
+  max$objective,
+  col = "red",
+  pch = 19
+)
 ```
