@@ -1,0 +1,47 @@
+Project Plan – Goals, Needs, Steps
+Activity 14 – Git and GitHub Practice
+
+GOALS
+
+- Create and maintain a public GitHub repo for Activity 14
+- Demonstrate Git functions: branching, issues, commits, pull requests
+- Add the Activity 14 files (Project 14.qmd and Project-14.pdf) to the main branch
+- Use issues, commits, and pull requests
+
+NEEDS
+
+- A public GitHub repo
+- Two branches: main (final) and dev (working)
+- Two GitHub issues, one for the QMD file and one for the PDF file
+- Local copies of the Activity 14 QMD and PDF files
+- Ability to create pull requests on GitHub merging dev into main
+- Final repo must contain the README.md, plan.txt, QMD file, PDF file, and evidence of issues and pull requests
+
+STEPS
+
+1. Repo Setup
+  1a. Create a public repository on GitHub.
+  1b. Clone the repository locally.
+  1c. Create and switch to a dev branch.
+
+2. Issues
+  2a. Create Issue 1 for the QMD file.
+  2b. Create Issue 2 for the PDF file.
+
+3. Add Activity 14 files to dev
+  3a. Move both Activity 14 files into dev
+  3b. Add and commit the QMD file, referencing Issue 1 in the commit message
+  3c. Push the dev branch to GitHub
+  3d. Add and commit the PDF file, referencing Issue 2 in the commit message
+  3e. Push the dev branch again
+
+4. Pull Request Workflow
+  4a. Create a pull request on GitHub from dev to main for the QMD file
+  4b. Merge pull request into main
+  4d. Create a second pull request from dev to main for the PDF file
+  4e. Merge the second pull request into main
+
+5. Documentation
+  5a. Write a complete README.md explaining project, repo, and contact information
+  5b. Save plan as plan.txt
+  5c. Commit both files to main
