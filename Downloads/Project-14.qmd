@@ -21,6 +21,7 @@ execute:
 ---
 
 ```{r}
+# Coding Style: Tidyverse
 #| label: docSetup
 #| include: false
 
