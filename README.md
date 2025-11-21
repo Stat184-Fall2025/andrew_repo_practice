@@ -31,30 +31,30 @@ This process demonstrates the standard professional workflow for connecting issu
 
 main/
 
-├── README.md
+-> README.md
 
-├── test.txt - Test file used for initial pull requests
+-> test.txt - Test file used for initial pull requests
 
-├── plan.txt
+-> plan.txt
 
-└── Downloads/
+-> Downloads/
 
-    ├── Project 14.qmd
+--> Project-14.qmd
     
-    └── Project-14.pdf
+--> Project-14.pdf
     
 
 dev/
 
-├── README.md
+-> README.md
 
-├── test.txt
+-> test.txt
 
-└── Downloads/
+-> Downloads/
 
-    ├── Project 14.qmd
+--> Project 14.qmd
     
-    └── Project-14.pdf
+--> Project-14.pdf
 
 
 ## Contact Information
@@ -66,4 +66,5 @@ For questions or additional details about this project, please contact:
 Email: andrewmason1325@gmail.com
 
 GitHub Profile: https://github.com/roocxre
+
 
