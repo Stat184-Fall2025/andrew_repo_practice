@@ -35,6 +35,8 @@ main/
 
 ├── test.txt - Test file used for initial pull requests
 
+├── plan.txt
+
 └── Downloads/
 
     ├── Project 14.qmd
@@ -64,3 +66,4 @@ For questions or additional details about this project, please contact:
 Email: andrewmason1325@gmail.com
 
 GitHub Profile: https://github.com/roocxre
+
